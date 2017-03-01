@@ -1,5 +1,5 @@
 import data as D
-import utils.mathz as M
+import utils.mathZ as M
 
 
 def gaussSingle(muin,varin,size,name='gaussian_single'):

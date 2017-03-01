@@ -1,9 +1,9 @@
 import numpy as np
 import numpy.random as npr
-import autograd.numpy.linalg as linalg
-
-PI = np.pi
-INF = 1e+10
+import numpy.linalg as linalg
+import utils
+PI = utils.PI
+INF = utils.INF
 
 def upTranMask(side):
     mask = np.triu( np.ones((side,side)) )
@@ -15,8 +15,11 @@ def lowTranMask(side):
     return mask
 
 
-def permutMat(side):
-    return npr.permutation(np.eye(side))
+def permutMat(side, enforcing=True):
+    mat = npr.permutation(np.eye(side))
+    while enforcing and (np.sum(np.abs(mat-np.eye(side)))==0):
+        mat = npr.permutation(np.eye(side))
+    return mat
 
 
 def gaussInit(muin,varin):
@@ -28,14 +31,14 @@ def gaussInit(muin,varin):
         def logP(x):
             submu = x-muin
             return logconst - 0.5*np.sum( submu*(np.dot(submu,varinv.T)), 1)
-        def generator(size):
-            return npr.multivariate_normal(muin,varin,size)
+        def generator(size,dtype='float64'):
+            return np.asarray( npr.multivariate_normal(muin,varin,size),dtype=dtype )
     except:
         def logP(x):
             logconst = -0.5 *np.log(2*PI) -0.5*np.log(varin)
             return logconst -0.5/varin*(x-muin)**2
-        def generator(size):
-            return npr.normal(muin,varin**.5,size)
+        def generator(size,dtype='float64'):
+            return np.asarray( npr.normal(muin,varin**.5,size),dtype=dtype )
     return logP, generator
 
 
