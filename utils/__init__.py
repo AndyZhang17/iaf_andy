@@ -14,3 +14,16 @@ def checkDictKeys(dictin,members,rerr=False):
 
 import mathT as mathT
 import mathZ as mathZ
+
+
+
+def checkFile(filepath):
+    import os.path as op
+    return op.exists(filepath)
+
+def checkDir(dir,build=True):
+    import os
+    flag = os.path.isdir(dir)
+    if build and (not flag):
+        os.makedirs(dir)
+    return flag

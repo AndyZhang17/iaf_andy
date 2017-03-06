@@ -48,7 +48,7 @@ def diagMaskL(dim,name=None):
 
 def linAutoregInitGauss(dim, scale=0.1, name=None):
     mask = M.upTranMask(dim)
-    weights = npr.randn(dim, dim)*np.sqrt(scale/(dim+dim))*mask
+    weights = npr.randn(dim, dim)*(scale/(dim+dim))*mask
     return Nd.sharedf( weights, name=name )
 
 def linScaleInit(dim,noise=True,name=None):

@@ -1,5 +1,5 @@
-__author__ = 'andy17'
 import numpy as np
+
 class dataset(object):
     def __init__(self,name):
         self.name=name
@@ -13,3 +13,6 @@ class dataset(object):
         self.numtrain = len(self.train)
 
 
+
+def loadData(filepath):
+    return np.load(filepath)

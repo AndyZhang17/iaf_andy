@@ -20,7 +20,7 @@ class IafStack(object):
         self.initLogPrior()
 
     def initLogPrior(self):
-        var = np.eye(self.dimin)*3.
+        var = np.eye(self.dimin)*10.
         self.meanLogPrior = mathT.gaussInit(np.zeros(self.dimin), var, mean=True)
         _, self.eGen  = mathZ.gaussInit(np.zeros(self.dimin), var)
 
@@ -42,7 +42,10 @@ class IafStack(object):
         return self.meanLogPrior(esamples) - totallogjaco
 
     def add(self,layer):
-        self.layers.append(layer)
+        if isinstance(layer,list) or isinstance(layer,tuple):
+            self.layers.extend(layer)
+        else:
+            self.layers.append(layer)
 
     def setCost(self,cost):
         for layer in self.layers:
@@ -113,37 +116,45 @@ class IafPermute(IafLayer):
 
 class IafLinear(IafLayer):
     def __init__(self, name, dim, lr):
+        '''
+        out = x + tanh( x*w + b )
+        :param name: str
+        :param dim:  int, dimension of the input nodes
+        :param lr:   theano symbolic, learning rate
+        :return:
+        '''
         super(IafLinear,self).__init__(name)
         self.lr = lr
         self.dimin = self.dimout = dim
         self.mask = weights.autoregMaskL(self.dimin)
-        # self.mask = weights.diagMaskL(self.dimin)
 
-        self.w = weights.linAutoregInitGauss(self.dimin, scale=0.1,name='w')
-        # self.b = weights.biasInitZero(self.dimout,name='b')
-        self.b = weights.biasInitRandn(self.dimout, mean=0, scale=.01, name='b')
-        self.u = weights.biasInitRandn(self.dimout, mean=0, scale=.01, name='u')
+        scale = (2.*(0.01**2)/self.dimin)**0.5
+        self.w = weights.linAutoregInitGauss(self.dimin, scale=scale,name='w')
+        self.b = weights.biasInitRandn(self.dimout, mean=0, scale=scale, name='b')
+        self.u = weights.biasInitRandn(self.dimout, mean=0, scale=scale, name='u')
 
         self.params = [self.w, self.b, self.u]
+        self.wdiag = Tlin.extract_diag( self.w )
         self.meanlogdetjaco = T.fscalar()
+        self.cost = T.fscalar()
 
-    def setParams(self,w,b,u):
+    def setParams(self, w, b, u):
         w,b,u = np.asarray(w), np.asarray(b), np.asarray(u)
-        self.w = N.sharedf(w,name='w')
-        self.b = N.sharedf(b,name='b')
-        self.u = N.sharedf(u,name='u')
+        self.w = N.sharedf(w, name='w')
+        self.b = N.sharedf(b, name='b')
+        self.u = N.sharedf(u, name='u')
         self.params = [self.w, self.b, self.u]
 
     def forward(self,x):
+        '''
+        passing x through this iaf layer
+        :param x: symbolic
+        :return:  symbolic
+        '''
         a = T.dot(x,self.w*self.mask) + self.b   # NxD
-        wdiag = Tlin.extract_diag( self.w )
-        # cosha = mathT.coshApx(a)
         coshsqr = mathT.coshsqrApx(a)
-        # coshsqr = T.sqr( T.cosh(a) )
-
-        self.meanlogdetjaco = T.mean( T.sum( T.log( T.abs_( 1.+ self.u*wdiag/coshsqr ) ), axis=1 ) )
+        self.meanlogdetjaco = T.mean( T.sum( T.log( T.abs_( 1.+ self.u*self.wdiag/coshsqr ) ), axis=1 ) )
         return x + self.u * mathT.tanhApx( a )
-        # return x + self.u * T.tanh( a )
 
     def logDetJaco(self):
         return self.meanlogdetjaco
@@ -152,7 +163,7 @@ class IafLinear(IafLayer):
         self.cost = cost
 
     def getUpdates(self):
-        return [ (p,N.newParam(p,self.cost,self.lr)) for p in self.params]
+        return [ (p,N.sgdParam(p,self.cost,self.lr)) for p in self.params]
 
     def getGrads(self,cost=None):
         if cost is not None:
@@ -160,10 +171,11 @@ class IafLinear(IafLayer):
         return [ T.grad(self.cost,wrt=p) for p in self.params ]
 
     def getValueParams(self):
-        def evalParam(p):
-            f = theano.function(inputs=[],outputs=p)
-            return f()
-        return [evalParam(p) for p in self.params]
+        # def evalParam(p):
+        #     f = theano.function(inputs=[],outputs=p)
+        #     return f()
+        # return [evalParam(p) for p in self.params]
+        return [ p.get_value() for p in self.params]
 
 
 

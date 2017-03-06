@@ -1,6 +1,11 @@
-__author__ = 'andy17'
 import matplotlib.pyplot as plt
 import numpy as np
+
+
+def scatter2d(x,y,type='b+',lims=None):
+    plt.plot(x,y,type)
+    plt.show()
+
 
 
 def hist_1d(x,bins=50,show=False):
@@ -19,7 +24,8 @@ def hist_2d(x,y,bins=50,show=False):
     plt.show()
 
 
-def line_2d(x,y,linetype='-',ylims=None):
+def line_2d(x,y,linetype='-',ylims=None,log=None,grid=False,title=None,xname='',yname=''):
+    x,y = np.asarray(x),np.asarray(y)
     if y.ndim==1:
         y = np.reshape(y,(len(y),1))
     if x.ndim==1:
@@ -28,10 +34,21 @@ def line_2d(x,y,linetype='-',ylims=None):
     for d in range(np.shape(y)[1]):
         id_x = min(d,x.shape[1]-1)
         plt.plot( x[:,id_x], y[:,d], linetype )
-
+    if title:
+        plt.title(title)
+    plt.grid(grid)
+    plt.xlabel(xname)
+    plt.ylabel(yname)
     if ylims!=None:
         x1,x2,y1,y2 = plt.axis()
         plt.axis((x1,x2,ylims[0],max(ylims[1],y2)))
+    if log=='y':
+        plt.yscale('log')
+    elif log=='x':
+        plt.xscale('log')
+    else:
+        pass
+
     plt.show()
 
 def hist2D(p,bins=50,show=False):

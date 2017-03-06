@@ -24,6 +24,7 @@ def permutMat(side, enforcing=True):
 
 def gaussInit(muin,varin):
     # single Gaussian
+    min,varin = np.asarray(muin),np.asarray(varin)
     try:
         d = len(muin)
         vardet, varinv = linalg.det(varin), linalg.inv(varin)

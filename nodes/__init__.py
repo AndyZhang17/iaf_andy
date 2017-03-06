@@ -40,7 +40,7 @@ def checkDictKeys(dictin,members,rerr=False):
     return valid
 
 
-def newParam(param,cost,lr):
+def sgdParam(param,cost,lr):
     return param - lr*T.grad(cost,wrt=param)
 
 
