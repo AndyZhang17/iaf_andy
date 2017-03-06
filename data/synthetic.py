@@ -11,9 +11,9 @@ def genGMM( numt,musin,varsin,probs,filepath):
 
 utils.checkDir('./tmp',build=True)
 musin = [[0,0],[-2,1]]
-varsin = [np.eye(2)/5., np.eye(2)/3]
+varsin = [np.eye(2)/5., np.eye(2)/5]
 probs = [0.5,0.5]
-genGMM( 1000, musin, varsin, probs, '/tmp/gmm1.npz' )
+genGMM( 2000, musin, varsin, probs, '/tmp/gmm1.npz' )
 
 
 

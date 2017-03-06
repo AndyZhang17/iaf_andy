@@ -7,6 +7,19 @@ import utils
 PI = utils.PI
 ZERO = utils.ZERO
 floatX = utils.floatX
+
+def gaussJoint(x,y,sigmas,mean=False):
+    '''input all symbolic'''
+    sigma2s = T.sqr(sigmas)
+    log_const = -x.shape[1]/2.*np.log(2*PI) -.5*T.sum(T.log(sigma2s))
+    diff = x-y
+    log_subs = -.5* T.sum(T.sqr(diff)/sigma2s,axis=1)
+    if mean:
+        return T.mean(log_const+log_subs)
+    return log_const+log_subs
+
+
+
 # multivariate Gaussian
 def gaussInit(muin,varin,mean=False):
     muin, varin = np.asarray(muin), np.asarray(varin)

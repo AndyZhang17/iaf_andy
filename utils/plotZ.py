@@ -7,7 +7,6 @@ def scatter2d(x,y,type='b+',lims=None):
     plt.show()
 
 
-
 def hist_1d(x,bins=50,show=False):
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -24,10 +23,15 @@ def hist_2d(x,y,bins=50,show=False):
     plt.show()
 
 
-def line_2d(x,y,linetype='-',ylims=None,log=None,grid=False,title=None,xname='',yname=''):
-    x,y = np.asarray(x),np.asarray(y)
+def line_2d(y,x=None,linetype='-',ylims=None,log=None,grid=False,title=None,xname='',yname=''):
+    y = np.asarray(y)
     if y.ndim==1:
         y = np.reshape(y,(len(y),1))
+
+    if x is None:
+        x = range(y.shape[0])
+    x = np.asarray(x)
+
     if x.ndim==1:
         x = np.reshape(x,(len(x),1))
     plt.figure()

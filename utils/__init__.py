@@ -12,6 +12,12 @@ def checkDictKeys(dictin,members,rerr=False):
         raise ValueError('[ERR] Setup dict doesn\'t satisfy:\ndict: %s\nrequired: %s' % (repr(dictin),repr(members)))
     return valid
 
+def sharedf(x, target=None, name=None,borrow=False):
+    if target is None:
+        return theano.shared(np.asarray(x,dtype=floatX), name=name, borrow=borrow, )
+    else:
+        return theano.shared(np.asarray(x,dtype=floatX), target=target, name=name, borrow=borrow)
+
 import mathT as mathT
 import mathZ as mathZ
 

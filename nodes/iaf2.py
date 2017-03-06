@@ -15,14 +15,20 @@ ZERO = utils.ZERO
 class IafStack(object):
     def __init__(self, name, dim):
         self.name = name
-        self.dimin = self.dimout = dim
+        self.dimin = self.dimout = self.dim = dim
         self.layers = []
         self.initLogPrior()
 
     def initLogPrior(self):
-        var = np.eye(self.dimin)*10.
+        var = np.eye(self.dim)*3.
+        self.noisestds = utils.sharedf(np.sqrt(np.diag(var)))
         self.meanLogPrior = mathT.gaussInit(np.zeros(self.dimin), var, mean=True)
         _, self.eGen  = mathZ.gaussInit(np.zeros(self.dimin), var)
+
+    def getNoise(self,num):
+        from theano.tensor.shared_randomstreams import RandomStreams as trands
+        trng = trands() # trands(seed=)
+        return trng.normal((num,self.dim)) * self.noisestds
 
     def forward(self,x,interout=False):
         y = self.layers[0].forward(x)
