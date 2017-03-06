@@ -1,3 +1,5 @@
 *.pyc
 learning*
 .ipynb_checkpoints
+.ipynb
+tmp
