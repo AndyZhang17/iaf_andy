@@ -19,7 +19,6 @@ class IafStack(object):
         self.lr = lr
         self.layers = []
         self.priorstd = N.sharedScalar( (4./self.dim)**.5 )
-        # self.priorstd = N.sharedScalar( 1. )
         self.initLogPrior()
 
     def initLogPrior(self):
@@ -75,6 +74,12 @@ class IafStack(object):
             params.extend(layer.params)
         return params
 
+    def getParamShapes(self):
+        shapes = list()
+        for layer in self.layers:
+            shapes.extend(layer.paramshapes)
+        return shapes
+
     def getGrads(self, cost=None):
         grads = list()
         for layer in self.layers:
@@ -93,6 +98,7 @@ class IafLayer(object):
     def __init__(self,name):
         self.name=name
         self.params = []
+        self.paramshapes = []
 
     def setCost(self,cost):
         pass
@@ -147,11 +153,13 @@ class IafLinear(IafLayer):
         # self.u = N.sharedf(np.zeros(self.dimout))
 
         self.params = [self.w, self.b, self.u]
+        self.paramshapes = [(dim,dim),(dim,),(dim,)]
         self.wdiag = Tlin.extract_diag( self.w )
         self.meanlogdetjaco = T.fscalar()
         self.cost = T.fscalar()
 
     def setParams(self, w, b, u):
+        '''DON'T USE'''
         w,b,u = np.asarray(w), np.asarray(b), np.asarray(u)
         self.w = N.sharedf(w, name='w')
         self.b = N.sharedf(b, name='b')
@@ -188,4 +196,18 @@ class IafLinear(IafLayer):
 
 
 
+def experiment(lr,dim):
+    Qexp = IafStack('IAF_MAP', dim=dim, lr=lr)
 
+    l1 = IafLinear('iaf1', dim, lr=lr)
+    p1 = IafPermute('per1', dim)
+    l2 = IafLinear('iaf2', dim, lr=lr)
+    p2 = IafPermute('per2', dim)
+    l3 = IafLinear('iaf3', dim, lr=lr)
+    p3 = IafPermute('per3', dim)
+    l4 = IafLinear('iaf4', dim, lr=lr)
+    p4 = IafPermute('per4', dim)
+    l5 = IafLinear('iaf5', dim, lr=lr)
+
+    Qexp.add([l1,p1,l2,p2,l3,p3,l4,p4,l5])
+    return Qexp
