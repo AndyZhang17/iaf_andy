@@ -12,9 +12,10 @@ import utils.spec as spec
 import time
 
 f32 = theano.config.floatX
-DIM = 2
-SAMPLING = int(3e+2)
+DIM = 15
+SAMPLING = int(10)
 SAMPLING_SHOW = int(5e+4)
+VISUAL = False
 
 DECAY = 1e-3
 LR0   = 0.1
@@ -27,10 +28,15 @@ MAXITER = 1000
 # logPZ = mathT.gaussInit([-2,1],np.eye(DIM),mean=True)
 # musin, varsin, probs = [[0,0],[-2,1],[1,+2]], [np.eye(DIM)/5.,np.eye(DIM)/5.,np.eye(DIM)/3.], [0.4,0.3,0.3]
 # musin, varsin, probs = [[0,0],[-2,1]], [np.eye(DIM)/5.,np.eye(DIM)/5.], [0.5,0.5]
-musin, varsin, probs = spec.gmmParam(2,dim=DIM)
+musin, varsin, probs = spec.gmmParam(4,dim=DIM)
+# musin, varsin, probs = np.zeros((2,DIM)),[np.eye(DIM),np.eye(DIM)],[.5,.5]
 logPZ = mathT.gaussMixInit(musin,varsin,probs,mean=True )
+# logPZ = mathT.gaussInit(np.zeros(DIM),np.eye(DIM),mean=True)
 _,targetGen = mathZ.gaussMixInit(musin,varsin,probs)
-plotZ.hist2D(targetGen(SAMPLING_SHOW))
+
+if VISUAL:
+    show = targetGen(SAMPLING_SHOW)
+    plotZ.hist2D(show[:,0:2],title='target dist')
 
 
 ## ----- ##
@@ -38,7 +44,7 @@ plotZ.hist2D(targetGen(SAMPLING_SHOW))
 ## ----- ##
 print('... constructing models')
 lr = T.fscalar()
-iafmodel = iaf.IafStack( 'IAF_MAP', dim=DIM )
+iafmodel = iaf.IafStack( 'IAF_MAP', dim=DIM, lr=lr)
 layer1 = iaf.IafLinear('iaf1', DIM, lr=lr)
 layerPer1 = iaf.IafPermute('per1', DIM)
 layer2 = iaf.IafLinear('iaf2', DIM, lr=lr)
@@ -71,10 +77,8 @@ iafmodel.setCost(kldiv)
 updates = iafmodel.getUpdates()
 
 print('... function construct')
-train = theano.function([lr], kldiv, updates=updates )
+train = theano.function([lr], [kldiv,logqz,logpz,z,iafmodel.meanlogprior], updates=updates )
 fz = theano.function([],z)
-
-print('> Start training, maxiter %d' % (MAXITER))
 
 
 def showValues(values, name):
@@ -94,23 +98,43 @@ def report(iter, cost, logq, logp, grads):
     print(out % tuple(nums))
 
 
-KL_list = list()
+values = iafmodel.getValueParams()
+showValues(values, 'initial parameters')
 
+tarz = targetGen(SAMPLING*4)
+vartar = np.trace(np.dot(tarz.T, tarz))/(SAMPLING*4*DIM)
 
-## RECORDING
+## --------- ##
+#  RECORDING  #
+## --------- ##
+print('> Start training, maxiter %d' % (MAXITER))
+record = np.zeros((MAXITER,7))
 i = 0
 t0 = time.time()
 while i<MAXITER:
     i+=1
     LR = LR0/(1+DECAY*i)
-    cost = train(LR)
-    KL_list.append(cost)
-    print('iter %d : KL %.4f' % (i,cost))
+    cost,lq,lp,z,meanprior = train(LR)
+
+    varz = np.trace( np.dot(z.T,z) )/(SAMPLING*DIM)
+    priorstd = iafmodel.priorstd.get_value()
+
+    record[i-1,:] = [cost,lq,lp,varz,vartar,priorstd,meanprior]
+    print('iter %d : KL %.4f ' % (i,cost))
+    # if (i-1)%int(MAXITER/4)==0:
+        # data_z = fz()
+        # plotZ.hist2D(data_z[:,:2])
 
 tused = time.time()-t0
 print('\n> total time used: %.2f min, per-iteration: %.2f s' %(tused/60, tused/float(i)))
 
+if VISUAL:
+    data_z = fz()
+    plotZ.hist2D(data_z[:,0:2],title='optimised dist')
+plotZ.line_2d(record[:,[0,1,2]],legend=['KL','log-q','log-p'],title='mean log(q(z)) & log(p(z))')
+# plotZ.line_2d(record[:,[1,2]],legend=['log-q','log-p'],title='mean log(q(z)) & log(p(z)), dim='+str(DIM))
+# plotZ.line_2d(record[:,1]-record[:,2],title='log(q(z)) - log(p(z)), dim='+str(DIM))
+plotZ.line_2d(record[:,3:5],legend=['var of z','var target'],title='variance of samples')
 
-data_z = fz()
-plotZ.hist2D(data_z)
-plotZ.line_2d(KL_list)
+values = iafmodel.getValueParams()
+showValues(values, 'trained parameters')

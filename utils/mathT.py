@@ -2,17 +2,18 @@ import theano
 import theano.tensor as T
 import numpy as np
 import numpy.linalg as linalg
+import theano.tensor.nlinalg as nlinalg
 import utils
 
 PI = utils.PI
 ZERO = utils.ZERO
 floatX = utils.floatX
 
-def gaussJoint(x,y,sigmas,mean=False):
+def gaussJoint(x,y,sigmas,numExp=1,mean=False):
     '''input all symbolic'''
     sigma2s = T.sqr(sigmas)
     log_const = -x.shape[1]/2.*np.log(2*PI) -.5*T.sum(T.log(sigma2s))
-    diff = x-y
+    diff = y-T.repeat(x,numExp,axis=0)
     log_subs = -.5* T.sum(T.sqr(diff)/sigma2s,axis=1)
     if mean:
         return T.mean(log_const+log_subs)
@@ -20,8 +21,21 @@ def gaussJoint(x,y,sigmas,mean=False):
 
 
 
-# multivariate Gaussian
 def gaussInit(muin,varin,mean=False):
+    d = muin.shape[0]
+    vardet, varinv = nlinalg.det(varin), nlinalg.matrix_inverse(varin)
+    logconst = -d/2.*np.log(2*PI) - .5*T.log(vardet)
+    def logP(x):
+        submu = x-muin
+        out = logconst - .5*T.sum(submu*(T.dot(submu, varinv.T)),axis=1)
+        if mean:
+            return T.mean(out)
+        return out
+    return logP
+
+
+# multivariate Gaussian
+def gaussInit0(muin,varin,mean=False):
     muin, varin = np.asarray(muin), np.asarray(varin)
     d = len(muin)
     vardet, varinv = linalg.det(varin), linalg.inv(varin)
@@ -42,7 +56,7 @@ def gaussMixInit(musin, varsin, probs, mean=False):
     def logP(x):
         indprobs = T.cast([ T.exp(gs[i](x))*probs[i] for i in range(numgauss) ],dtype=floatX)
         xprobs = T.sum(indprobs,axis=0)
-        out = T.log(xprobs+ZERO)
+        out = T.log(xprobs)
         if mean:
             return T.mean(out)
         return out

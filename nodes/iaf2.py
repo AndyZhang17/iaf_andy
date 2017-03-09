@@ -13,22 +13,24 @@ floatX = theano.config.floatX
 ZERO = utils.ZERO
 
 class IafStack(object):
-    def __init__(self, name, dim):
+    def __init__(self, name, dim, lr):
         self.name = name
         self.dimin = self.dimout = self.dim = dim
+        self.lr = lr
         self.layers = []
+        self.priorstd = N.sharedScalar( (4./self.dim)**.5 )
+        # self.priorstd = N.sharedScalar( 1. )
         self.initLogPrior()
 
     def initLogPrior(self):
-        var = np.eye(self.dim)*3.
-        self.noisestds = utils.sharedf(np.sqrt(np.diag(var)))
-        self.meanLogPrior = mathT.gaussInit(np.zeros(self.dimin), var, mean=True)
-        _, self.eGen  = mathZ.gaussInit(np.zeros(self.dimin), var)
+        noisevar = N.sharedf(np.eye(self.dim))*T.sqr(self.priorstd)
+        noisemu = N.sharedf(np.zeros(self.dim))
+        self.meanLogPrior = mathT.gaussInit(noisemu, noisevar, mean=True)
 
-    def getNoise(self,num):
+    def getNoise(self,numD):
         from theano.tensor.shared_randomstreams import RandomStreams as trands
         trng = trands() # trands(seed=)
-        return trng.normal((num,self.dim)) * self.noisestds
+        return trng.normal((numD,self.dim)) * self.priorstd
 
     def forward(self,x,interout=False):
         y = self.layers[0].forward(x)
@@ -45,7 +47,9 @@ class IafStack(object):
         totallogjaco = N.sharedScalar(0.)
         for layer in self.layers:
             totallogjaco = totallogjaco + layer.logDetJaco()
-        return self.meanLogPrior(esamples) - totallogjaco
+        self.meanlogprior = self.meanLogPrior(esamples)
+        return self.meanlogprior - totallogjaco
+        # return self.meanLogPrior(esamples) - totallogjaco
 
     def add(self,layer):
         if isinstance(layer,list) or isinstance(layer,tuple):
@@ -54,10 +58,12 @@ class IafStack(object):
             self.layers.append(layer)
 
     def setCost(self,cost):
+        self.cost = cost
         for layer in self.layers:
-            layer.setCost(cost)
+            layer.setCost(self.cost)
 
     def getUpdates(self):
+        # updates = [(self.priorstd,N.sgdParam(self.priorstd,self.cost,self.lr))]
         updates = list()
         for layer in self.layers:
             updates.extend(layer.getUpdates())
@@ -138,6 +144,7 @@ class IafLinear(IafLayer):
         self.w = weights.linAutoregInitGauss(self.dimin, scale=scale,name='w')
         self.b = weights.biasInitRandn(self.dimout, mean=0, scale=scale, name='b')
         self.u = weights.biasInitRandn(self.dimout, mean=0, scale=scale, name='u')
+        # self.u = N.sharedf(np.zeros(self.dimout))
 
         self.params = [self.w, self.b, self.u]
         self.wdiag = Tlin.extract_diag( self.w )
@@ -177,10 +184,6 @@ class IafLinear(IafLayer):
         return [ T.grad(self.cost,wrt=p) for p in self.params ]
 
     def getValueParams(self):
-        # def evalParam(p):
-        #     f = theano.function(inputs=[],outputs=p)
-        #     return f()
-        # return [evalParam(p) for p in self.params]
         return [ p.get_value() for p in self.params]
 
 

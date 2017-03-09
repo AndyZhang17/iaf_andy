@@ -2,7 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def scatter2d(x,y,type='b+',lims=None):
+def scatter2d(x,y=None,type='b+',lims=None):
+    if y is None:
+        x,y = x[:,0],x[:,1]
     plt.plot(x,y,type)
     plt.show()
 
@@ -23,7 +25,7 @@ def hist_2d(x,y,bins=50,show=False):
     plt.show()
 
 
-def line_2d(y,x=None,linetype='-',ylims=None,log=None,grid=False,title=None,xname='',yname=''):
+def line_2d(y,x=None,linetype='-',ylims=None,log=None,grid=False,title=None,xname='',yname='',legend=None):
     y = np.asarray(y)
     if y.ndim==1:
         y = np.reshape(y,(len(y),1))
@@ -35,9 +37,15 @@ def line_2d(y,x=None,linetype='-',ylims=None,log=None,grid=False,title=None,xnam
     if x.ndim==1:
         x = np.reshape(x,(len(x),1))
     plt.figure()
+
     for d in range(np.shape(y)[1]):
         id_x = min(d,x.shape[1]-1)
-        plt.plot( x[:,id_x], y[:,d], linetype )
+        if legend is None:
+            plt.plot( x[:,id_x], y[:,d], linetype )
+        else:
+            plt.plot( x[:,id_x], y[:,d], linetype, label=legend[d])
+    if legend is not None:
+        plt.legend()
     if title:
         plt.title(title)
     plt.grid(grid)
@@ -55,10 +63,11 @@ def line_2d(y,x=None,linetype='-',ylims=None,log=None,grid=False,title=None,xnam
 
     plt.show()
 
-def hist2D(p,bins=50,show=False):
+def hist2D(p,bins=50,title=None):
     heatmap, xedges, yedges = np.histogram2d(p[:,0],p[:,1],bins=bins)
     extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
     plt.figure()
     plt.clf()
     plt.imshow(heatmap.T,extent=extent,origin='lower')
+    plt.title(title)
     plt.show()
