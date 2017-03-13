@@ -20,7 +20,7 @@ class banana(model.model):
         self.stdn = utils.sharedf([.5,.5])
         self.varn = nlinalg.diag(T.sqr(self.stdn))
 
-        self.logPz = mathT.gaussInit(self.priormus,self.priorvar,mean=True)
+        self.logPz = mathT.gaussInit(self.priormus,self.priorvar)
 
     def logPrior(self,z):
         return self.logPz(z)
@@ -30,7 +30,7 @@ class banana(model.model):
         model specific likelihood
         :return: log-P(x|z)
         '''
-        logPxz = mathT.gaussInit(x,self.varn,mean=True)
+        logPxz = mathT.gaussInit(x,self.varn)
         z1z2 = T.prod(z,axis=1,keepdims=True)
         return logPxz(T.concatenate([z1z2,z1z2],axis=1))
 

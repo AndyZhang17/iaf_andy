@@ -21,15 +21,13 @@ def gaussJoint(x,y,sigmas,numExp=1,mean=False):
 
 
 
-def gaussInit(muin,varin,mean=False):
+def gaussInit(muin,varin):
     d = muin.shape[0]
     vardet, varinv = nlinalg.det(varin), nlinalg.matrix_inverse(varin)
     logconst = -d/2.*np.log(2*PI) - .5*T.log(vardet)
     def logP(x):
         submu = x-muin
         out = logconst - .5*T.sum(submu*(T.dot(submu, varinv.T)),axis=1)
-        if mean:
-            return T.mean(out)
         return out
     return logP
 
@@ -71,6 +69,10 @@ def coshApx(x, offset=1.5):
 
 def coshsqrApx(x, offset=1.5):
     out = T.switch(compAbs(x,offset), .25*T.exp(2*T.abs_(x)), T.sqr(T.cosh(x)))
+    return out
+
+def coshsqrinvApx(x, offset=1.5):
+    out = T.switch(compAbs(x,offset), 4.*T.exp(-2.*T.abs_(x)), T.sqr(T.cosh(x)**-1))
     return out
 
 def tanhApx(x, offset=1.5):

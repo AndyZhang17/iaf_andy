@@ -6,4 +6,4 @@ def makeFunc(inputs, outputs, updates, givens):
 
 import adagrad as adagrad
 import sgd as sgd
-
+import sgdMom as sgdMom

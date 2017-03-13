@@ -10,14 +10,6 @@ import theano.tensor as T
 import utils
 import optimisor
 
-def makeFunc(params, cost, updates):
-    f = theano.function(
-        inputs = [],
-        outputs = cost,
-        updates = updates
-    )
-    return f
-
 ## ------- ##
 #  ADAGRAD  #
 ## ------- ##

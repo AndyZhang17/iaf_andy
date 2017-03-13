@@ -5,60 +5,74 @@ import utils
 import utils.plotZ as plotZ
 import theano
 import theano.tensor as T
+import theano.tensor.nlinalg as nlinalg
 import nodes.iaf2 as iaf
 import model.mars1 as M
 from optimisor.adagrad import opt as adagrad
 from optimisor.sgd import opt as sgd
+from optimisor.sgdMom import opt as sgdMom
 
 f32 = theano.config.floatX
-SAMPLING = int(1e+1)
-DECAY = 3e-5
-LR0 = 0.01
-MAXITER = 10000
+SAMPLING = int(10)
+DECAY = 1e-3
+LR0 = 0.05
+MAXITER = 3000
 VISUAL = True
-LOG = './tmp/debug.npz'
 utils.checkDir('./tmp', build=True)
 
 
+
+
 print('... constructing model')
-VALX = -.8
+VALX = -1.2
 x = utils.sharedf([VALX,VALX])
 model = M.banana()
 
 
-print('... constructing variational distribution and symbol flows')
+print('... variational distribution and symbol flows')
 lr = T.fscalar()
 qiaf = iaf.experiment(lr,2)
 e = qiaf.getNoise(SAMPLING)
 z = qiaf.forward(e, interout=False)
 
 logqz = qiaf.mcLogQZ(e)
-logpz = model.logPrior(z)
-logpxz = model.logLik(x,z)
+logpz = T.mean(model.logPrior(z))
+logpxz = T.mean(model.logLik(x,z))
 negELBO = -logpxz+logqz-logpz
 
 
 
-print('... optimisor construct')
-eStep = adagrad(params=qiaf.getParams(),cost=negELBO,
-                paramshapes=qiaf.getParamShapes(),inputs=[],outputs=[negELBO])
-# eStep = sgd(qiaf.getParams(),negELBO,inputs=[lr],outputs=[negELBO])
-
+print('... optimisor')
+# eStep = adagrad(params=qiaf.getParams(),cost=negELBO,
+#                 paramshapes=qiaf.getParamShapes(),inputs=[],outputs=[negELBO])
+eStep = sgd(qiaf.getParams(),negELBO,
+            inputs=[lr],outputs=[negELBO,z,logqz,logpz,logpxz,e],
+            consider_constant=[])
+# eStep = sgdMom(qiaf.getParams(),negELBO,qiaf.getParamShapes(),
+#                inputs=[lr],outputs=[negELBO,z,logqz,logpz,logpxz,e],mom=0.)
 
 print('> Start optimisation')
-record = {'ms':np.zeros((MAXITER,2)),'zs':np.zeros((MAXITER,SAMPLING,2))}
+EXP_NAME = 'sgd1'
+LOG = './tmp/debug_'+EXP_NAME+'.npz'
+record = {'ms':np.zeros((MAXITER,4)),'zs':np.zeros((MAXITER,SAMPLING,2)),
+          'es':np.zeros((MAXITER,SAMPLING,2)) }
 
 for i in range(MAXITER):
     LR = LR0/(1.+DECAY*i)
-    # [cost] = eStep(LR)
-    [cost] = eStep()
-    record['ms'][i,0] = cost
-    # record['zs'][i,:,:] = zsamples
+    [cost,zs,qz,pz,pxz,es] = eStep(LR)
+    # [cost] = eStep()
+    record['ms'][i,:4] = [cost,qz,pz,pxz]
+    record['zs'][i,:,:] = zs
+    record['es'][i,:,:] = es
     print('iter %d : ELBO %.4f' %(i,-cost))
     if np.isnan(cost):
         break
-# np.savez(LOG,elbo=record['ms'][:,0],zsamples=record['zs'][:,:,:],valx=VALX)
 
+print('... saving LOG to \'%s\''%(LOG))
+np.savez(LOG,ms=record['ms'][:,:],
+         zs=record['zs'][:,:,:],
+         es = record['es'][:,:,:],
+         valx=VALX)
 
 if VISUAL:
     e1  = qiaf.getNoise(int(5e+4))

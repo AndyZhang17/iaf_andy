@@ -24,31 +24,27 @@ class IafStack(object):
     def initLogPrior(self):
         noisevar = N.sharedf(np.eye(self.dim))*T.sqr(self.priorstd)
         noisemu = N.sharedf(np.zeros(self.dim))
-        self.meanLogPrior = mathT.gaussInit(noisemu, noisevar, mean=True)
+        self.logPrior = mathT.gaussInit(noisemu, noisevar)
 
-    def getNoise(self,numD):
+    def getNoise(self,num):
         from theano.tensor.shared_randomstreams import RandomStreams as trands
-        trng = trands() # trands(seed=)
-        return trng.normal((numD,self.dim)) * self.priorstd
+        trng = trands()
+        return trng.normal((num,self.dim)) * self.priorstd
 
     def forward(self,x,interout=False):
-        y = self.layers[0].forward(x)
-        intery = [y]
-        if len(self.layers)>1:
-            for layer in self.layers[1:]:
-                y = layer.forward(y)
-                intery.append(y)
+        intery = [self.layers[0].forward(x)]
+        for layer in self.layers[1:]:
+            intery.append( layer.forward(intery[-1]) )
         if interout:
-            return y, intery
-        return y
+            return intery[-1], intery
+        return intery[-1]
 
     def mcLogQZ(self,esamples):
-        totallogjaco = N.sharedScalar(0.)
-        for layer in self.layers:
+        totallogjaco = self.layers[0].logDetJaco()
+        for layer in self.layers[1:]:
             totallogjaco = totallogjaco + layer.logDetJaco()
-        self.meanlogprior = self.meanLogPrior(esamples)
+        self.meanlogprior = T.mean(self.logPrior(esamples))
         return self.meanlogprior - totallogjaco
-        # return self.meanLogPrior(esamples) - totallogjaco
 
     def add(self,layer):
         if isinstance(layer,list) or isinstance(layer,tuple):
@@ -61,18 +57,17 @@ class IafStack(object):
         for layer in self.layers:
             layer.setCost(self.cost)
 
-    def getUpdates(self):
-        # updates = [(self.priorstd,N.sgdParam(self.priorstd,self.cost,self.lr))]
-        updates = list()
-        for layer in self.layers:
-            updates.extend(layer.getUpdates())
-        return updates
-
     def getParams(self):
         params = list()
         for layer in self.layers:
             params.extend(layer.params)
         return params
+
+    def getUpdates(self):
+        updates = list()
+        for layer in self.layers:
+            updates.extend(layer.getUpdates())
+        return updates
 
     def getParamShapes(self):
         shapes = list()
@@ -146,11 +141,10 @@ class IafLinear(IafLayer):
         self.dimin = self.dimout = dim
         self.mask = weights.autoregMaskL(self.dimin)
 
-        scale = (2.*(0.01**2)/self.dimin)**0.5
+        scale = (.0002/self.dimin)**0.5
         self.w = weights.linAutoregInitGauss(self.dimin, scale=scale,name='w')
         self.b = weights.biasInitRandn(self.dimout, mean=0, scale=scale, name='b')
         self.u = weights.biasInitRandn(self.dimout, mean=0, scale=scale, name='u')
-        # self.u = N.sharedf(np.zeros(self.dimout))
 
         self.params = [self.w, self.b, self.u]
         self.paramshapes = [(dim,dim),(dim,),(dim,)]
@@ -159,7 +153,10 @@ class IafLinear(IafLayer):
         self.cost = T.fscalar()
 
     def setParams(self, w, b, u):
-        '''DON'T USE'''
+        '''
+        DON'T USE
+        should replace the values of w,b,u in-place
+        '''
         w,b,u = np.asarray(w), np.asarray(b), np.asarray(u)
         self.w = N.sharedf(w, name='w')
         self.b = N.sharedf(b, name='b')
@@ -172,10 +169,11 @@ class IafLinear(IafLayer):
         :param x: symbolic
         :return:  symbolic
         '''
-        a = T.dot(x,self.w*self.mask) + self.b   # NxD
-        coshsqr = mathT.coshsqrApx(a)
-        self.meanlogdetjaco = T.mean( T.sum( T.log( T.abs_( 1.+ self.u*self.wdiag/coshsqr ) ), axis=1 ) )
-        return x + self.u * mathT.tanhApx( a )
+        a = T.dot(x, self.w*self.mask) + self.b   # NxD
+        # coshsqr = mathT.coshsqrApx(a)
+        coshsqrinv = mathT.coshsqrinvApx(a)
+        self.meanlogdetjaco = T.mean( T.sum( T.log( T.abs_( 1.+ self.u*self.wdiag*coshsqrinv ) ), axis=1 ) )
+        return x + self.u *mathT.tanhApx(a)
 
     def logDetJaco(self):
         return self.meanlogdetjaco
